@@ -47,6 +47,7 @@ static void usage(const char *argv0)
 		   "                          This is the default action.\n"
            "  -x, --extract      Extract data from file.\n"
 		   "                          This is also the default action.\n"
+           "  -c, --create       Create a new file.\n"
 		   "  -p, --plain        Extract data without decrypting.\n"
 		   "  -r, --raw          Keep raw data, don't unpack.\n"
 		   "  -k, --keyset=file  Specify keyset file.\n"
@@ -78,6 +79,8 @@ static void usage(const char *argv0)
 		   "CWAV options:\n"
 		   "  --wav=file         Specify wav output file.\n"
 		   "  --wavloops=count   Specify wav loop count, default 0.\n"
+		   "EXEFS options:\n"
+		   "  --sectionN=file    Specify input file for section N (0 <= N < 8)\n"
 		   "ROMFS options:\n"
 		   "  --romfsdir=dir     Specify RomFS directory path.\n"
 		   "  --listromfs        List files in RomFS.\n"
@@ -289,8 +292,6 @@ int action_parse(toolcontext* ctx, char* fname)
 
 int action_create(toolcontext* ctx, char* fname)
 {
-	u8 magic[4];
-
 	ctx->outfile = fopen(fname, "wb");
 
 	if (ctx->outfile == 0) 
@@ -298,10 +299,6 @@ int action_create(toolcontext* ctx, char* fname)
 		fprintf(stderr, "error: could not open output file!\n");
 		return -1;
 	}
-
-	fseek(ctx->infile, 0, SEEK_END);
-	ctx->infilesize = ftell(ctx->infile);
-	fseek(ctx->infile, 0, SEEK_SET);
 
 	if (ctx->filetype == FILETYPE_UNKNOWN)
 	{
@@ -351,6 +348,7 @@ int main(int argc, char* argv[])
 		int option_index;
 		static struct option long_options[] = 
 		{
+			{"create", 0, NULL, 'c'},
 			{"extract", 0, NULL, 'x'},
 			{"plain", 0, NULL, 'p'},
 			{"info", 0, NULL, 'i'},
@@ -383,7 +381,7 @@ int main(int argc, char* argv[])
 			{NULL},
 		};
 
-		c = getopt_long(argc, argv, "ryxivpk:n:t:", long_options, &option_index);
+		c = getopt_long(argc, argv, "ryxcivpk:n:t:", long_options, &option_index);
 		if (c == -1)
 			break;
 
