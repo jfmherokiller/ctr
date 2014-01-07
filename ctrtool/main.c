@@ -41,7 +41,7 @@ static void usage(const char *argv0)
 	fprintf(stderr,
 		   "Usage: %s [options...] <file>\n"
 		   "CTRTOOL (c) neimod.\n"
-		   "(smea fork)\n"
+		   "(smea fork, BLZ code by CUE)\n"
            "\n"
            "Options:\n"
            "  -i, --info           Show file info.\n"
