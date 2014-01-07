@@ -365,7 +365,7 @@ void exefs_create(exefs_context* ctx)
 	for(i=0;i<8;i++)
 	{
 		exefs_write_section(ctx, i);
-		memcpy(ctx->header.section[i].name, settings_get_exefs_section_path(ctx->usersettings, i), 0x8);
+		memcpy(ctx->header.section[i].name, settings_get_exefs_section_name(ctx->usersettings, i), 0x8);
 		fseek(ctx->file, 0x10-(ftell(ctx->file)&0xF), SEEK_CUR);
 	}
 

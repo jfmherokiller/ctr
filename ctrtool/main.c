@@ -269,6 +269,19 @@ int action_parse(toolcontext* ctx, char* fname)
 			break;
 		}
 
+		case FILETYPE_EXEFS:
+		{
+			exefs_context exefsctx;
+
+			exefs_init(&exefsctx);
+			exefs_set_file(&exefsctx, ctx->infile);
+			exefs_set_size(&exefsctx, ctx->infilesize);
+			exefs_set_usersettings(&exefsctx, &ctx->usersettings);
+			exefs_process(&exefsctx, ctx->actions);
+	
+			break;
+		}
+
 		case FILETYPE_ROMFS:
 		{
 			romfs_context romfsctx;

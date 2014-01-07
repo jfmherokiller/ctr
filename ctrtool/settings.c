@@ -189,15 +189,22 @@ int settings_get_cwav_loopcount(settings* usersettings)
 
 void settings_set_exefs_section_path(settings* usersettings, u32 n, const char* path)
 {
-	if(n>7)return;
-	filepath_set(&usersettings->exefssectionpath[n], path);
+	if (usersettings && n<=7 && path)
+	{
+		filepath_set(&usersettings->exefssectionpath[n], path);
+	}
 }
 
 void settings_set_exefs_section_name(settings* usersettings, u32 n, const char* name)
 {
-	if(n>7)return;
-	memset(usersettings->exefssectionname[n], 0, 8);
-	memcpy(usersettings->exefssectionname[n], name, strlen(name));
+	if (usersettings && n<=7 && name)
+	{
+		memset(usersettings->exefssectionname[n], 0, 8);
+		int min=strlen(name);
+		if(min>8)
+			min=8;
+		memcpy(usersettings->exefssectionname[n], name, min);
+	}
 }
 
 void settings_set_wav_path(settings* usersettings, const char* path)
