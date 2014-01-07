@@ -23,7 +23,8 @@ enum flags
 	RawFlag = (1<<5),
 	ShowKeysFlag = (1<<6),
 	ParseFlag = (1<<7),
-	CreateFlag = (1<<8)
+	CreateFlag = (1<<8),
+	CompressCodeFlag = (1<<9)
 };
 
 

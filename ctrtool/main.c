@@ -41,6 +41,7 @@ static void usage(const char *argv0)
 	fprintf(stderr,
 		   "Usage: %s [options...] <file>\n"
 		   "CTRTOOL (c) neimod.\n"
+		   "(smea fork)\n"
            "\n"
            "Options:\n"
            "  -i, --info           Show file info.\n"
@@ -80,6 +81,7 @@ static void usage(const char *argv0)
 		   "  --wav=file           Specify wav output file.\n"
 		   "  --wavloops=count     Specify wav loop count, default 0.\n"
 		   "EXEFS options:\n"  
+		   "  --compresscode       Compress .code section\n"
 		   "  --sectionNfile=file  Specify input file for section N (0 <= N < 8)\n"
 		   "  --sectionNname=file  Specify input file for section N (0 <= N < 8)\n"
 		   "ROMFS options:\n"  
@@ -327,7 +329,7 @@ int action_create(toolcontext* ctx, char* fname)
 			exefs_init(&exefsctx);
 			exefs_set_file(&exefsctx, ctx->outfile);
 			exefs_set_usersettings(&exefsctx, &ctx->usersettings);
-			exefs_create(&exefsctx);
+			exefs_create(&exefsctx, ctx->actions);
 	
 			break;
 		}
@@ -411,6 +413,8 @@ int main(int argc, char* argv[])
 			{"section5name", 1, NULL, SECTION_NAME_ARG_BASE+5},
 			{"section6name", 1, NULL, SECTION_NAME_ARG_BASE+6},
 			{"section7name", 1, NULL, SECTION_NAME_ARG_BASE+7},
+
+			{"compresscode", 0, NULL, 40},
 			{NULL},
 		};
 
@@ -501,6 +505,7 @@ int main(int argc, char* argv[])
 			case 17: settings_set_romfs_dir_path(&ctx.usersettings, optarg); break;
 			case 18: settings_set_list_romfs_files(&ctx.usersettings, 1); break;
 			case 19: settings_set_cwav_loopcount(&ctx.usersettings, strtoul(optarg, 0, 0)); break;
+			case 40: ctx.actions |= CompressCodeFlag; break;
 
 			case SECTION_FILE_ARG_BASE+0:
 			case SECTION_FILE_ARG_BASE+1:

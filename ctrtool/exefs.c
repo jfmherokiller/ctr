@@ -6,6 +6,7 @@
 #include "exefs.h"
 #include "utils.h"
 #include "ncch.h"
+#include "blz.h"
 #include "lzss.h"
 
 void exefs_init(exefs_context* ctx)
@@ -302,7 +303,7 @@ clean:
 	return 0;
 }
 
-int exefs_write_section(exefs_context* ctx, u32 index)
+int exefs_write_section(exefs_context* ctx, u32 index, u32 flags)
 {
 	exefs_sectionheader* section = (exefs_sectionheader*)(ctx->header.section + index);
 	filepath* sectionpath = settings_get_exefs_section_path(ctx->usersettings, index);
@@ -325,30 +326,44 @@ int exefs_write_section(exefs_context* ctx, u32 index)
 	size = ftell(sectionfile);
 	fseek(sectionfile, 0, SEEK_SET);
 
-	putle32(section->size, size);
-	putle32(section->offset, ftell(ctx->file)-sizeof(exefs_header));
-	
 	ctr_sha_256_init(&ctx->sha);
-
-	while(size)
+	
+	if((flags & CompressCodeFlag) && memcmp(settings_get_exefs_section_name(ctx->usersettings, index), ".code", 0x6))
 	{
-		u32 max = sizeof(buffer);
-		if (max > size)
-			max = size;
-
-		if (max != fread(buffer, 1, max, sectionfile))
+		unsigned int pak_len;
+		unsigned char* pak_buffer = BLZ_Encode(sectionpath->pathname, &pak_len, BLZ_NORMAL);
+		if (!pak_buffer)
 		{
 			fprintf(stdout, "Error reading input file\n");
 			goto clean;
 		}
-		fwrite(buffer, 1, max, ctx->file);
+		fwrite(pak_buffer, 1, pak_len, ctx->file);
+		ctr_sha_256_update(&ctx->sha, pak_buffer, pak_len);
+		free(pak_buffer);
+	}else{
+		while(size)
+		{
+			u32 max = sizeof(buffer);
+			if (max > size)
+				max = size;
 
-		ctr_sha_256_update(&ctx->sha, buffer, max);
+			if (max != fread(buffer, 1, max, sectionfile))
+			{
+				fprintf(stdout, "Error reading input file\n");
+				goto clean;
+			}
+			fwrite(buffer, 1, max, ctx->file);
 
-		size -= max;
-	}	
+			ctr_sha_256_update(&ctx->sha, buffer, max);
+
+			size -= max;
+		}		
+	}
 
 	ctr_sha_256_finish(&ctx->sha, hash);
+	
+	putle32(section->size, size);
+	putle32(section->offset, ftell(ctx->file)-sizeof(exefs_header));
 
 	memcpy(ctx->header.hashes[7-index], hash, 0x20);
 
@@ -357,14 +372,14 @@ clean:
 	return 0;
 }
 
-void exefs_create(exefs_context* ctx)
+void exefs_create(exefs_context* ctx, u32 actions)
 {
 	int i;
 	fseek(ctx->file, sizeof(exefs_header), SEEK_SET);
 
 	for(i=0;i<8;i++)
 	{
-		exefs_write_section(ctx, i);
+		exefs_write_section(ctx, i, actions);
 		memcpy(ctx->header.section[i].name, settings_get_exefs_section_name(ctx->usersettings, i), 0x8);
 		fseek(ctx->file, 0x10-(ftell(ctx->file)&0xF), SEEK_CUR);
 	}
