@@ -326,26 +326,28 @@ int exefs_write_section(exefs_context* ctx, u32 index, u32 flags)
 	size = ftell(sectionfile);
 	fseek(sectionfile, 0, SEEK_SET);
 
+	putle32(section->offset, ftell(ctx->file)-sizeof(exefs_header));
+
 	ctr_sha_256_init(&ctx->sha);
 	
 	if((flags & CompressCodeFlag) && memcmp(settings_get_exefs_section_name(ctx->usersettings, index), ".code", 0x6))
 	{
-		unsigned int pak_len;
-		unsigned char* pak_buffer = BLZ_Encode(sectionpath->pathname, &pak_len, BLZ_NORMAL);
+		unsigned char* pak_buffer = BLZ_Encode(sectionpath->pathname, &size, BLZ_NORMAL);
 		if (!pak_buffer)
 		{
 			fprintf(stdout, "Error reading input file\n");
 			goto clean;
 		}
-		fwrite(pak_buffer, 1, pak_len, ctx->file);
-		ctr_sha_256_update(&ctx->sha, pak_buffer, pak_len);
+		fwrite(pak_buffer, 1, size, ctx->file);
+		ctr_sha_256_update(&ctx->sha, pak_buffer, size);
 		free(pak_buffer);
 	}else{
-		while(size)
+		u32 k=size;
+		while(k)
 		{
 			u32 max = sizeof(buffer);
-			if (max > size)
-				max = size;
+			if (max > k)
+				max = k;
 
 			if (max != fread(buffer, 1, max, sectionfile))
 			{
@@ -356,14 +358,13 @@ int exefs_write_section(exefs_context* ctx, u32 index, u32 flags)
 
 			ctr_sha_256_update(&ctx->sha, buffer, max);
 
-			size -= max;
+			k -= max;
 		}		
 	}
 
 	ctr_sha_256_finish(&ctx->sha, hash);
 	
 	putle32(section->size, size);
-	putle32(section->offset, ftell(ctx->file)-sizeof(exefs_header));
 
 	memcpy(ctx->header.hashes[7-index], hash, 0x20);
 
