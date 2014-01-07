@@ -43,47 +43,48 @@ static void usage(const char *argv0)
 		   "CTRTOOL (c) neimod.\n"
            "\n"
            "Options:\n"
-           "  -i, --info         Show file info.\n"
-		   "                          This is the default action.\n"
-           "  -x, --extract      Extract data from file.\n"
-		   "                          This is also the default action.\n"
-           "  -c, --create       Create a new file.\n"
-		   "  -p, --plain        Extract data without decrypting.\n"
-		   "  -r, --raw          Keep raw data, don't unpack.\n"
-		   "  -k, --keyset=file  Specify keyset file.\n"
-		   "  -v, --verbose      Give verbose output.\n"
-		   "  -y, --verify       Verify hashes and signatures.\n"
-		   "  --unitsize=size    Set media unit size (default 0x200).\n"
-		   "  --commonkey=key    Set common key.\n"
-		   "  --ncchkey=key      Set ncch key.\n"
-		   "  --ncchsyskey=key   Set ncch fixed system key.\n"
-		   "  --showkeys         Show the keys being used.\n"
-		   "  -t, --intype=type	 Specify input file type [ncsd, ncch, exheader, cia, tmd, lzss,\n"
-		   "                        firm, cwav, romfs]\n"
-		   "LZSS options:\n"
-		   "  --lzssout=file	 Specify lzss output file\n"
-		   "CXI/CCI options:\n"
-		   "  -n, --ncch=offs    Specify offset for NCCH header.\n"
-		   "  --exefs=file       Specify ExeFS file path.\n"
-		   "  --exefsdir=dir     Specify ExeFS directory path.\n"
-		   "  --romfs=file       Specify RomFS file path.\n"
-		   "  --exheader=file    Specify Extended Header file path.\n"
-		   "CIA options:\n"
-		   "  --certs=file       Specify Certificate chain file path.\n"
-		   "  --tik=file         Specify Ticket file path.\n"
-		   "  --tmd=file         Specify TMD file path.\n"
-		   "  --contents=file    Specify Contents file path.\n"
-		   "  --meta=file        Specify Meta file path.\n"
-		   "FIRM options:\n"
-		   "  --firmdir=dir      Specify Firm directory path.\n"
-		   "CWAV options:\n"
-		   "  --wav=file         Specify wav output file.\n"
-		   "  --wavloops=count   Specify wav loop count, default 0.\n"
-		   "EXEFS options:\n"
-		   "  --sectionN=file    Specify input file for section N (0 <= N < 8)\n"
-		   "ROMFS options:\n"
-		   "  --romfsdir=dir     Specify RomFS directory path.\n"
-		   "  --listromfs        List files in RomFS.\n"
+           "  -i, --info           Show file info.\n"
+		   "                            This is the default action.\n"
+           "  -x, --extract        Extract data from file.\n"
+		   "                            This is also the default action.\n"
+           "  -c, --create         Create a new file.\n"
+		   "  -p, --plain          Extract data without decrypting.\n"
+		   "  -r, --raw            Keep raw data, don't unpack.\n"
+		   "  -k, --keyset=file    Specify keyset file.\n"
+		   "  -v, --verbose        Give verbose output.\n"
+		   "  -y, --verify         Verify hashes and signatures.\n"
+		   "  --unitsize=size      Set media unit size (default 0x200).\n"
+		   "  --commonkey=key      Set common key.\n"
+		   "  --ncchkey=key        Set ncch key.\n"
+		   "  --ncchsyskey=key     Set ncch fixed system key.\n"
+		   "  --showkeys           Show the keys being used.\n"
+		   "  -t, --intype=type	   Specify input file type [ncsd, ncch, exheader, cia, tmd,\n"
+		   "                                                lzss, firm, cwav, romfs]\n"
+		   "LZSS options:\n"  
+		   "  --lzssout=file	   Specify lzss output file\n"
+		   "CXI/CCI options:\n"  
+		   "  -n, --ncch=offs      Specify offset for NCCH header.\n"
+		   "  --exefs=file         Specify ExeFS file path.\n"
+		   "  --exefsdir=dir       Specify ExeFS directory path.\n"
+		   "  --romfs=file         Specify RomFS file path.\n"
+		   "  --exheader=file      Specify Extended Header file path.\n"
+		   "CIA options:\n"  
+		   "  --certs=file         Specify Certificate chain file path.\n"
+		   "  --tik=file           Specify Ticket file path.\n"
+		   "  --tmd=file           Specify TMD file path.\n"
+		   "  --contents=file      Specify Contents file path.\n"
+		   "  --meta=file          Specify Meta file path.\n"
+		   "FIRM options:\n"  
+		   "  --firmdir=dir        Specify Firm directory path.\n"
+		   "CWAV options:\n"  
+		   "  --wav=file           Specify wav output file.\n"
+		   "  --wavloops=count     Specify wav loop count, default 0.\n"
+		   "EXEFS options:\n"  
+		   "  --sectionNfile=file  Specify input file for section N (0 <= N < 8)\n"
+		   "  --sectionNname=file  Specify input file for section N (0 <= N < 8)\n"
+		   "ROMFS options:\n"  
+		   "  --romfsdir=dir       Specify RomFS directory path.\n"
+		   "  --listromfs          List files in RomFS.\n"
            "\n",
 		   argv0);
    exit(1);
@@ -104,8 +105,6 @@ int action_parse(toolcontext* ctx, char* fname)
 	fseek(ctx->infile, 0, SEEK_END);
 	ctx->infilesize = ftell(ctx->infile);
 	fseek(ctx->infile, 0, SEEK_SET);
-
-
 
 
 	if (ctx->filetype == FILETYPE_UNKNOWN)
@@ -308,18 +307,21 @@ int action_create(toolcontext* ctx, char* fname)
 
 	switch(ctx->filetype)
 	{
-		case FILETYPE_ROMFS:
+		case FILETYPE_EXEFS:
 		{
 			exefs_context exefsctx;
 
 			exefs_init(&exefsctx);
+			exefs_set_file(&exefsctx, ctx->outfile);
+			exefs_set_usersettings(&exefsctx, &ctx->usersettings);
+			exefs_create(&exefsctx);
 	
 			break;
 		}
 	}
 	
-	if (ctx->infile)
-		fclose(ctx->infile);
+	if (ctx->outfile)
+		fclose(ctx->outfile);
 
 	return 0;
 }
@@ -378,6 +380,24 @@ int main(int argc, char* argv[])
 			{"romfsdir", 1, NULL, 17},
 			{"listromfs", 0, NULL, 18},
 			{"wavloops", 1, NULL, 19},
+
+			{"section0file", 1, NULL, SECTION_FILE_ARG_BASE+0},
+			{"section1file", 1, NULL, SECTION_FILE_ARG_BASE+1},
+			{"section2file", 1, NULL, SECTION_FILE_ARG_BASE+2},
+			{"section3file", 1, NULL, SECTION_FILE_ARG_BASE+3},
+			{"section4file", 1, NULL, SECTION_FILE_ARG_BASE+4},
+			{"section5file", 1, NULL, SECTION_FILE_ARG_BASE+5},
+			{"section6file", 1, NULL, SECTION_FILE_ARG_BASE+6},
+			{"section7file", 1, NULL, SECTION_FILE_ARG_BASE+7},
+
+			{"section0name", 1, NULL, SECTION_NAME_ARG_BASE+0},
+			{"section1name", 1, NULL, SECTION_NAME_ARG_BASE+1},
+			{"section2name", 1, NULL, SECTION_NAME_ARG_BASE+2},
+			{"section3name", 1, NULL, SECTION_NAME_ARG_BASE+3},
+			{"section4name", 1, NULL, SECTION_NAME_ARG_BASE+4},
+			{"section5name", 1, NULL, SECTION_NAME_ARG_BASE+5},
+			{"section6name", 1, NULL, SECTION_NAME_ARG_BASE+6},
+			{"section7name", 1, NULL, SECTION_NAME_ARG_BASE+7},
 			{NULL},
 		};
 
@@ -442,6 +462,8 @@ int main(int argc, char* argv[])
 					ctx.filetype = FILETYPE_FIRM;
 				else if (!strcmp(optarg, "cwav"))
 					ctx.filetype = FILETYPE_CWAV;
+				else if (!strcmp(optarg, "exefs"))
+					ctx.filetype = FILETYPE_EXEFS;
 				else if (!strcmp(optarg, "romfs"))
 					ctx.filetype = FILETYPE_ROMFS;
 			break;
@@ -466,6 +488,28 @@ int main(int argc, char* argv[])
 			case 17: settings_set_romfs_dir_path(&ctx.usersettings, optarg); break;
 			case 18: settings_set_list_romfs_files(&ctx.usersettings, 1); break;
 			case 19: settings_set_cwav_loopcount(&ctx.usersettings, strtoul(optarg, 0, 0)); break;
+
+			case SECTION_FILE_ARG_BASE+0:
+			case SECTION_FILE_ARG_BASE+1:
+			case SECTION_FILE_ARG_BASE+2:
+			case SECTION_FILE_ARG_BASE+3:
+			case SECTION_FILE_ARG_BASE+4:
+			case SECTION_FILE_ARG_BASE+5:
+			case SECTION_FILE_ARG_BASE+6:
+			case SECTION_FILE_ARG_BASE+7:
+				settings_set_exefs_section_path(&ctx.usersettings, c-SECTION_FILE_ARG_BASE, optarg);
+			break;
+
+			case SECTION_NAME_ARG_BASE+0:
+			case SECTION_NAME_ARG_BASE+1:
+			case SECTION_NAME_ARG_BASE+2:
+			case SECTION_NAME_ARG_BASE+3:
+			case SECTION_NAME_ARG_BASE+4:
+			case SECTION_NAME_ARG_BASE+5:
+			case SECTION_NAME_ARG_BASE+6:
+			case SECTION_NAME_ARG_BASE+7:
+				settings_set_exefs_section_name(&ctx.usersettings, c-SECTION_NAME_ARG_BASE, optarg);
+			break;
 
 
 			default:

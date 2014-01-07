@@ -302,6 +302,77 @@ clean:
 	return 0;
 }
 
+int exefs_write_section(exefs_context* ctx, u32 index)
+{
+	exefs_sectionheader* section = (exefs_sectionheader*)(ctx->header.section + index);
+	filepath* sectionpath = settings_get_exefs_section_path(ctx->usersettings, index);
+	u8 buffer[16 * 1024];
+	u8 hash[0x20];
+	u32 size;
+	FILE* sectionfile;
+
+	if(sectionpath == 0 || !sectionpath->valid)
+		goto clean;
+
+	sectionfile=fopen(sectionpath->pathname,"rb");
+	if(sectionfile == 0)
+	{
+		fprintf(stdout, "Error reading input section file\n");
+		goto clean;
+	}
+
+	fseek(sectionfile, 0, SEEK_END);
+	size = ftell(sectionfile);
+	fseek(sectionfile, 0, SEEK_SET);
+
+	putle32(section->size, size);
+	putle32(section->offset, ftell(ctx->file)-sizeof(exefs_header));
+	
+	ctr_sha_256_init(&ctx->sha);
+
+	while(size)
+	{
+		u32 max = sizeof(buffer);
+		if (max > size)
+			max = size;
+
+		if (max != fread(buffer, 1, max, sectionfile))
+		{
+			fprintf(stdout, "Error reading input file\n");
+			goto clean;
+		}
+		fwrite(buffer, 1, max, ctx->file);
+
+		ctr_sha_256_update(&ctx->sha, buffer, max);
+
+		size -= max;
+	}	
+
+	ctr_sha_256_finish(&ctx->sha, hash);
+
+	memcpy(ctx->header.hashes[7-index], hash, 0x20);
+
+	fclose(sectionfile);
+clean:
+	return 0;
+}
+
+void exefs_create(exefs_context* ctx)
+{
+	int i;
+	fseek(ctx->file, sizeof(exefs_header), SEEK_SET);
+
+	for(i=0;i<8;i++)
+	{
+		exefs_write_section(ctx, i);
+		memcpy(ctx->header.section[i].name, settings_get_exefs_section_path(ctx->usersettings, i), 0x8);
+		fseek(ctx->file, 0x10-(ftell(ctx->file)&0xF), SEEK_CUR);
+	}
+
+	fseek(ctx->file, 0, SEEK_SET);
+	fwrite(&ctx->header, 1, sizeof(exefs_header), ctx->file);
+}
+
 void exefs_print(exefs_context* ctx)
 {
 	u32 i;
