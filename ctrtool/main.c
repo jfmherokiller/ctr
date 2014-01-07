@@ -31,6 +31,7 @@ typedef struct
 	int actions;
 	u32 filetype;
 	FILE* infile;
+	FILE* outfile;
 	u32 infilesize;
 	settings usersettings;
 } toolcontext;
@@ -85,12 +86,251 @@ static void usage(const char *argv0)
    exit(1);
 }
 
+int action_parse(toolcontext* ctx, char* fname)
+{
+	u8 magic[4];
+
+	ctx->infile = fopen(fname, "rb");
+
+	if (ctx->infile == 0) 
+	{
+		fprintf(stderr, "error: could not open input file!\n");
+		return -1;
+	}
+
+	fseek(ctx->infile, 0, SEEK_END);
+	ctx->infilesize = ftell(ctx->infile);
+	fseek(ctx->infile, 0, SEEK_SET);
+
+
+
+
+	if (ctx->filetype == FILETYPE_UNKNOWN)
+	{
+		fseek(ctx->infile, 0x100, SEEK_SET);
+		fread(&magic, 1, 4, ctx->infile);
+
+		switch(getle32(magic))
+		{
+			case MAGIC_NCCH:
+				ctx->filetype = FILETYPE_CXI;
+			break;
+
+			case MAGIC_NCSD:
+				ctx->filetype = FILETYPE_CCI;
+			break;
+
+			default:
+			break;
+		}
+	}
+
+	if (ctx->filetype == FILETYPE_UNKNOWN)
+	{
+		fseek(ctx->infile, 0, SEEK_SET);
+		fread(magic, 1, 4, ctx->infile);
+		
+		switch(getle32(magic))
+		{
+			case 0x2020:
+				ctx->filetype = FILETYPE_CIA;
+			break;
+
+			case MAGIC_FIRM:
+				ctx->filetype = FILETYPE_FIRM;
+			break;
+
+			case MAGIC_CWAV:
+				ctx->filetype = FILETYPE_CWAV;
+			break;
+
+			case MAGIC_IVFC:
+				ctx->filetype = FILETYPE_ROMFS; // TODO: need to determine more here.. savegames use IVFC too, but is not ROMFS.
+			break;
+		}
+	}
+
+	if (ctx->filetype == FILETYPE_UNKNOWN)
+	{
+		fprintf(stdout, "Unknown file\n");
+		exit(1);
+	}
+
+
+	switch(ctx->filetype)
+	{
+		case FILETYPE_CCI:
+		{
+			ncsd_context ncsdctx;
+
+			ncsd_init(&ncsdctx);
+			ncsd_set_file(&ncsdctx, ctx->infile);
+			ncsd_set_size(&ncsdctx, ctx->infilesize);
+			ncsd_set_usersettings(&ncsdctx, &ctx->usersettings);
+			ncsd_process(&ncsdctx, ctx->actions);
+			
+			break;			
+		}
+
+		case FILETYPE_FIRM:
+		{
+			firm_context firmctx;
+
+			firm_init(&firmctx);
+			firm_set_file(&firmctx, ctx->infile);
+			firm_set_size(&firmctx, ctx->infilesize);
+			firm_set_usersettings(&firmctx, &ctx->usersettings);
+			firm_process(&firmctx, ctx->actions);
+			
+			break;			
+		}
+		
+		case FILETYPE_CXI:
+		{
+			ncch_context ncchctx;
+
+			ncch_init(&ncchctx);
+			ncch_set_file(&ncchctx, ctx->infile);
+			ncch_set_size(&ncchctx, ctx->infilesize);
+			ncch_set_usersettings(&ncchctx, &ctx->usersettings);
+			ncch_process(&ncchctx, ctx->actions);
+
+			break;
+		}
+		
+
+		case FILETYPE_CIA:
+		{
+			cia_context ciactx;
+
+			cia_init(&ciactx);
+			cia_set_file(&ciactx, ctx->infile);
+			cia_set_size(&ciactx, ctx->infilesize);
+			cia_set_usersettings(&ciactx, &ctx->usersettings);
+			cia_process(&ciactx, ctx->actions);
+
+			break;
+		}
+
+		case FILETYPE_EXHEADER:
+		{
+			exheader_context exheaderctx;
+
+			exheader_init(&exheaderctx);
+			exheader_set_file(&exheaderctx, ctx->infile);
+			exheader_set_size(&exheaderctx, ctx->infilesize);
+			settings_set_ignore_programid(&ctx->usersettings, 1);
+
+			exheader_set_usersettings(&exheaderctx, &ctx->usersettings);
+			exheader_process(&exheaderctx, ctx->actions);
+	
+			break;
+		}
+
+		case FILETYPE_TMD:
+		{
+			tmd_context tmdctx;
+
+			tmd_init(&tmdctx);
+			tmd_set_file(&tmdctx, ctx->infile);
+			tmd_set_size(&tmdctx, ctx->infilesize);
+			tmd_set_usersettings(&tmdctx, &ctx->usersettings);
+			tmd_process(&tmdctx, ctx->actions);
+	
+			break;
+		}
+
+		case FILETYPE_LZSS:
+		{
+			lzss_context lzssctx;
+
+			lzss_init(&lzssctx);
+			lzss_set_file(&lzssctx, ctx->infile);
+			lzss_set_size(&lzssctx, ctx->infilesize);
+			lzss_set_usersettings(&lzssctx, &ctx->usersettings);
+			lzss_process(&lzssctx, ctx->actions);
+	
+			break;
+		}
+
+
+		case FILETYPE_CWAV:
+		{
+			cwav_context cwavctx;
+
+			cwav_init(&cwavctx);
+			cwav_set_file(&cwavctx, ctx->infile);
+			cwav_set_size(&cwavctx, ctx->infilesize);
+			cwav_set_usersettings(&cwavctx, &ctx->usersettings);
+			cwav_process(&cwavctx, ctx->actions);
+	
+			break;
+		}
+
+		case FILETYPE_ROMFS:
+		{
+			romfs_context romfsctx;
+
+			romfs_init(&romfsctx);
+			romfs_set_file(&romfsctx, ctx->infile);
+			romfs_set_size(&romfsctx, ctx->infilesize);
+			romfs_set_usersettings(&romfsctx, &ctx->usersettings);
+			romfs_process(&romfsctx, ctx->actions);
+	
+			break;
+		}
+	}
+	
+	if (ctx->infile)
+		fclose(ctx->infile);
+
+	return 0;
+}
+
+int action_create(toolcontext* ctx, char* fname)
+{
+	u8 magic[4];
+
+	ctx->outfile = fopen(fname, "wb");
+
+	if (ctx->outfile == 0) 
+	{
+		fprintf(stderr, "error: could not open output file!\n");
+		return -1;
+	}
+
+	fseek(ctx->infile, 0, SEEK_END);
+	ctx->infilesize = ftell(ctx->infile);
+	fseek(ctx->infile, 0, SEEK_SET);
+
+	if (ctx->filetype == FILETYPE_UNKNOWN)
+	{
+		fprintf(stdout, "Please specify a file type\n");
+		exit(1);
+	}
+
+	switch(ctx->filetype)
+	{
+		case FILETYPE_ROMFS:
+		{
+			exefs_context exefsctx;
+
+			exefs_init(&exefsctx);
+	
+			break;
+		}
+	}
+	
+	if (ctx->infile)
+		fclose(ctx->infile);
+
+	return 0;
+}
 
 int main(int argc, char* argv[])
 {
 	toolcontext ctx;
-	u8 magic[4];
-	char infname[512];
+	char fname[512];
 	int c;
 	u32 ncchoffset = ~0;
 	char keysetfname[512] = "keys.xml";
@@ -98,7 +338,7 @@ int main(int argc, char* argv[])
 	unsigned int checkkeysetfile = 0;
 	
 	memset(&ctx, 0, sizeof(toolcontext));
-	ctx.actions = InfoFlag | ExtractFlag;
+	ctx.actions = InfoFlag | ExtractFlag | ParseFlag;
 	ctx.filetype = FILETYPE_UNKNOWN;
 
 	settings_init(&ctx.usersettings);
@@ -149,6 +389,11 @@ int main(int argc, char* argv[])
 
 		switch (c) 
 		{
+			case 'c':
+				ctx.actions |= CreateFlag;
+				ctx.actions &= ~ParseFlag;
+			break;
+
 			case 'x':
 				ctx.actions |= ExtractFlag;
 			break;
@@ -233,7 +478,7 @@ int main(int argc, char* argv[])
 	if (optind == argc - 1) 
 	{
 		// Exactly one extra argument - an input file
-		strncpy(infname, argv[optind], sizeof(infname));
+		strncpy(fname, argv[optind], sizeof(fname));
 	} 
 	else if ( (optind < argc) || (argc == 1) )
 	{
@@ -246,199 +491,8 @@ int main(int argc, char* argv[])
 	if (ctx.actions & ShowKeysFlag)
 		keyset_dump(&ctx.usersettings.keys);
 
-	ctx.infile = fopen(infname, "rb");
+	if(ctx.actions & ParseFlag)return action_parse(&ctx, fname);
+	else if(ctx.actions & CreateFlag)return action_create(&ctx, fname);
 
-	if (ctx.infile == 0) 
-	{
-		fprintf(stderr, "error: could not open input file!\n");
-		return -1;
-	}
-
-	fseek(ctx.infile, 0, SEEK_END);
-	ctx.infilesize = ftell(ctx.infile);
-	fseek(ctx.infile, 0, SEEK_SET);
-
-
-
-
-	if (ctx.filetype == FILETYPE_UNKNOWN)
-	{
-		fseek(ctx.infile, 0x100, SEEK_SET);
-		fread(&magic, 1, 4, ctx.infile);
-
-		switch(getle32(magic))
-		{
-			case MAGIC_NCCH:
-				ctx.filetype = FILETYPE_CXI;
-			break;
-
-			case MAGIC_NCSD:
-				ctx.filetype = FILETYPE_CCI;
-			break;
-
-			default:
-			break;
-		}
-	}
-
-	if (ctx.filetype == FILETYPE_UNKNOWN)
-	{
-		fseek(ctx.infile, 0, SEEK_SET);
-		fread(magic, 1, 4, ctx.infile);
-		
-		switch(getle32(magic))
-		{
-			case 0x2020:
-				ctx.filetype = FILETYPE_CIA;
-			break;
-
-			case MAGIC_FIRM:
-				ctx.filetype = FILETYPE_FIRM;
-			break;
-
-			case MAGIC_CWAV:
-				ctx.filetype = FILETYPE_CWAV;
-			break;
-
-			case MAGIC_IVFC:
-				ctx.filetype = FILETYPE_ROMFS; // TODO: need to determine more here.. savegames use IVFC too, but is not ROMFS.
-			break;
-		}
-	}
-
-	if (ctx.filetype == FILETYPE_UNKNOWN)
-	{
-		fprintf(stdout, "Unknown file\n");
-		exit(1);
-	}
-
-
-	switch(ctx.filetype)
-	{
-		case FILETYPE_CCI:
-		{
-			ncsd_context ncsdctx;
-
-			ncsd_init(&ncsdctx);
-			ncsd_set_file(&ncsdctx, ctx.infile);
-			ncsd_set_size(&ncsdctx, ctx.infilesize);
-			ncsd_set_usersettings(&ncsdctx, &ctx.usersettings);
-			ncsd_process(&ncsdctx, ctx.actions);
-			
-			break;			
-		}
-
-		case FILETYPE_FIRM:
-		{
-			firm_context firmctx;
-
-			firm_init(&firmctx);
-			firm_set_file(&firmctx, ctx.infile);
-			firm_set_size(&firmctx, ctx.infilesize);
-			firm_set_usersettings(&firmctx, &ctx.usersettings);
-			firm_process(&firmctx, ctx.actions);
-			
-			break;			
-		}
-		
-		case FILETYPE_CXI:
-		{
-			ncch_context ncchctx;
-
-			ncch_init(&ncchctx);
-			ncch_set_file(&ncchctx, ctx.infile);
-			ncch_set_size(&ncchctx, ctx.infilesize);
-			ncch_set_usersettings(&ncchctx, &ctx.usersettings);
-			ncch_process(&ncchctx, ctx.actions);
-
-			break;
-		}
-		
-
-		case FILETYPE_CIA:
-		{
-			cia_context ciactx;
-
-			cia_init(&ciactx);
-			cia_set_file(&ciactx, ctx.infile);
-			cia_set_size(&ciactx, ctx.infilesize);
-			cia_set_usersettings(&ciactx, &ctx.usersettings);
-			cia_process(&ciactx, ctx.actions);
-
-			break;
-		}
-
-		case FILETYPE_EXHEADER:
-		{
-			exheader_context exheaderctx;
-
-			exheader_init(&exheaderctx);
-			exheader_set_file(&exheaderctx, ctx.infile);
-			exheader_set_size(&exheaderctx, ctx.infilesize);
-			settings_set_ignore_programid(&ctx.usersettings, 1);
-
-			exheader_set_usersettings(&exheaderctx, &ctx.usersettings);
-			exheader_process(&exheaderctx, ctx.actions);
-	
-			break;
-		}
-
-		case FILETYPE_TMD:
-		{
-			tmd_context tmdctx;
-
-			tmd_init(&tmdctx);
-			tmd_set_file(&tmdctx, ctx.infile);
-			tmd_set_size(&tmdctx, ctx.infilesize);
-			tmd_set_usersettings(&tmdctx, &ctx.usersettings);
-			tmd_process(&tmdctx, ctx.actions);
-	
-			break;
-		}
-
-		case FILETYPE_LZSS:
-		{
-			lzss_context lzssctx;
-
-			lzss_init(&lzssctx);
-			lzss_set_file(&lzssctx, ctx.infile);
-			lzss_set_size(&lzssctx, ctx.infilesize);
-			lzss_set_usersettings(&lzssctx, &ctx.usersettings);
-			lzss_process(&lzssctx, ctx.actions);
-	
-			break;
-		}
-
-
-		case FILETYPE_CWAV:
-		{
-			cwav_context cwavctx;
-
-			cwav_init(&cwavctx);
-			cwav_set_file(&cwavctx, ctx.infile);
-			cwav_set_size(&cwavctx, ctx.infilesize);
-			cwav_set_usersettings(&cwavctx, &ctx.usersettings);
-			cwav_process(&cwavctx, ctx.actions);
-	
-			break;
-		}
-
-		case FILETYPE_ROMFS:
-		{
-			romfs_context romfsctx;
-
-			romfs_init(&romfsctx);
-			romfs_set_file(&romfsctx, ctx.infile);
-			romfs_set_size(&romfsctx, ctx.infilesize);
-			romfs_set_usersettings(&romfsctx, &ctx.usersettings);
-			romfs_process(&romfsctx, ctx.actions);
-	
-			break;
-		}
-	}
-	
-	if (ctx.infile)
-		fclose(ctx.infile);
-
-	return 0;
+	return -1; //shouldn't happen ffs
 }
