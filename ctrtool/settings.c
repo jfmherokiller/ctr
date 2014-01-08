@@ -199,8 +199,8 @@ void settings_set_exefs_section_name(settings* usersettings, u32 n, const char* 
 {
 	if (usersettings && n<=7 && name)
 	{
-		memset(usersettings->exefssectionname[n], 0, 8);
 		int min=strlen(name);
+		memset(usersettings->exefssectionname[n], 0, 8);
 		if(min>8)
 			min=8;
 		memcpy(usersettings->exefssectionname[n], name, min);

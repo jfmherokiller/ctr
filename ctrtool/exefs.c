@@ -330,7 +330,7 @@ int exefs_write_section(exefs_context* ctx, u32 index, u32 flags)
 
 	ctr_sha_256_init(&ctx->sha);
 	
-	if((flags & CompressCodeFlag) && memcmp(settings_get_exefs_section_name(ctx->usersettings, index), ".code", 0x6))
+	if((flags & CompressCodeFlag) && !memcmp(settings_get_exefs_section_name(ctx->usersettings, index), ".code", 0x6))
 	{
 		unsigned char* pak_buffer = BLZ_Encode(sectionpath->pathname, &size, BLZ_NORMAL);
 		if (!pak_buffer)
@@ -382,7 +382,7 @@ void exefs_create(exefs_context* ctx, u32 actions)
 	{
 		exefs_write_section(ctx, i, actions);
 		memcpy(ctx->header.section[i].name, settings_get_exefs_section_name(ctx->usersettings, i), 0x8);
-		fseek(ctx->file, 0x10-(ftell(ctx->file)&0xF), SEEK_CUR);
+		fseek(ctx->file, 0x100-(ftell(ctx->file)&0xFF), SEEK_CUR);
 	}
 
 	fseek(ctx->file, 0, SEEK_SET);
