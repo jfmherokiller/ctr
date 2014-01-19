@@ -39,6 +39,29 @@ uint32_t cro_decode_seg_offset(cro_segment* seg_tbl, uint32_t seg_tbl_num, uint3
     return seg_tbl[seg_idx].base + (off >> 4);
 }
 
+void cro_do_patch(cro_segment* seg_tbl, uint32_t seg_tbl_num, uint8_t* cro, cro_patch* patch) {
+    uint32_t out_off = cro_decode_seg_offset(seg_tbl, seg_tbl_num, patch->out_off);
+    uint32_t* out = (uint32_t*) (cro + out_off);
+
+    switch(patch->type) {
+    case 0:
+        break;
+    case 2: // u32 absolute
+        *out = patch->x;
+        break;
+    case 3:  // u32 relative TODO
+    case 10: // THUMB branch TODO
+    case 28: // ARM branch TODO
+    case 29: // ARM branch modify TODO
+    case 42: // u32 relative (weird) TODO
+        printf("ERROR: unhandled import type %x\n", (unsigned int) patch->type);
+        break;
+
+    default:
+        printf("ERROR: unknown import type %x for %s\n", (unsigned int) patch->type);
+    }
+}
+
 void cro_process(FILE* fd, size_t len) {
     uint8_t* cro = malloc(len);
 
@@ -61,6 +84,8 @@ void cro_process(FILE* fd, size_t len) {
         free(cro);
         return;
     }
+
+    printf("Module name: %s\n", cro + h.name_off);
 
     // Dump header.
     printf("\nHeader:\n");
@@ -105,8 +130,8 @@ void cro_process(FILE* fd, size_t len) {
     printf("Import Strings size:\t0x%"PRIx32"\n", h.imp_str_sz);
     printf("unk8 offset:\t\t0x%"PRIx32"\n", h.unk8_off);
     printf("unk8 num:\t\t%"PRId32"\n", h.unk8_num);
-    printf("Import Info offset:\t0x%"PRIx32"\n", h.imp_info_off);
-    printf("Import Info num:\t%"PRId32"\n", h.imp_info_num);
+    printf("Patches offset:\t0x%"PRIx32"\n", h.patches_off);
+    printf("Patches num:\t%"PRId32"\n", h.patches_num);
     printf("unk9 offset:\t\t0x%"PRIx32"\n", h.unk9_off);
     printf("unk9 num:\t\t%"PRId32"\n", h.unk9_num);
 
@@ -151,12 +176,21 @@ void cro_process(FILE* fd, size_t len) {
         }
     }
 
+    // Perform patches.
+    if(h.patches_num) {
+        printf("Performing relocation patches..\n");
+        cro_patch* p = (cro_patch*) (cro + h.patches_off);
+
+        for(i=0; i<h.patches_num; i++) {
+            cro_do_patch(s, h.seg_tbl_num, cro, &p[i]);
+        }
+    }
+
     // Dump exports.
     if(h.exp_tbl_num) {
         cro_export* e = (cro_export*) (cro + h.exp_tbl_off);
 
         printf("\nExport Table:\n");
-        uint32_t i;
         for(i=0; i<h.exp_tbl_num; i++) {
             printf("Export %d\n", i);
 
@@ -189,7 +223,6 @@ void cro_process(FILE* fd, size_t len) {
             size_t n = 0;
             do {
                 uint32_t out_off = cro_decode_seg_offset(s, h.seg_tbl_num, sy->out_off);
-                uint32_t* out = (uint32_t*) (cro + out_off);
 
                 if(sym_fd != NULL) {
                     char name[256];
@@ -199,33 +232,14 @@ void cro_process(FILE* fd, size_t len) {
                     fprintf(sym_fd, "MakeComm(0x%"PRIx32", \"%s\");\n", out_off, cro + im[i].name_off);
                 }
 
-                printf("\t\tWrite out=%"PRIx32" type=%x x=%"PRIx32"\n",
-                       out_off, (unsigned int) sy->type, sy->x);
+                printf("\t\tWrite out=%"PRIx32" type=%x x=%"PRIx32"\n", out_off,
+                       (unsigned int) sy->type, sy->x);
 
                 // XXX: keep IDA from XREF:ing all unlinked function pointers.
                 if(sy->x == 0)
                     sy->x = 0xBADC0DE;
 
-                switch(sy->type) {
-                case 0:
-                    break;
-                case 2: // u32 absolute
-                    *out = sy->x;
-                    break;
-                case 3:  // u32 relative TODO
-                case 10: // THUMB branch TODO
-                case 28: // ARM branch TODO
-                case 29: // ARM branch modify TODO
-                case 42: // u32 relative (weird) TODO
-                    printf("ERROR: unhandled import type %x for %s\n",
-                           (unsigned int) sy->type, cro + im[i].name_off);
-                    break;
-
-                default:
-                    printf("ERROR: unknown import type %x for %s\n",
-                           (unsigned int) sy->type, cro + im[i].name_off);
-                }
-
+                cro_do_patch(s, h.seg_tbl_num, cro, sy);
                 n++;
             } while(!(sy++)->is_last);
         }

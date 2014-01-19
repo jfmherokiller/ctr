@@ -67,8 +67,8 @@ typedef struct {
     uint32_t imp_str_sz;
     uint32_t unk8_off; // ??
     uint32_t unk8_num;
-    uint32_t imp_info_off;
-    uint32_t imp_info_num;
+    uint32_t patches_off;
+    uint32_t patches_num;
     uint32_t unk9_off; // ??
     uint32_t unk9_num;
     uint32_t padding[0x12];
