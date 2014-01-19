@@ -17,6 +17,7 @@
 #include "firm.h"
 #include "cwav.h"
 #include "romfs.h"
+#include "cro.h"
 
 enum cryptotype
 {
@@ -40,6 +41,7 @@ static void usage(const char *argv0)
 	fprintf(stderr,
 		   "Usage: %s [options...] <file>\n"
 		   "CTRTOOL (c) neimod.\n"
+		   "(c) plutooo.\n"
            "\n"
            "Options:\n"
            "  -i, --info         Show file info.\n"
@@ -57,7 +59,7 @@ static void usage(const char *argv0)
 		   "  --ncchsyskey=key   Set ncch fixed system key.\n"
 		   "  --showkeys         Show the keys being used.\n"
 		   "  -t, --intype=type	 Specify input file type [ncsd, ncch, exheader, cia, tmd, lzss,\n"
-		   "                        firm, cwav, romfs]\n"
+		   "                        firm, cwav, romfs, cro]\n"
 		   "LZSS options:\n"
 		   "  --lzssout=file	 Specify lzss output file\n"
 		   "CXI/CCI options:\n"
@@ -80,6 +82,9 @@ static void usage(const char *argv0)
 		   "ROMFS options:\n"
 		   "  --romfsdir=dir     Specify RomFS directory path.\n"
 		   "  --listromfs        List files in RomFS.\n"
+		   "CRO options:\n"
+		   "  --symbols=file     Output IDA Pro script with symbols/segments.\n"
+		   "  --linkedcro=file   Output patched CRO file according to import-table.\n"
            "\n",
 		   argv0);
    exit(1);
@@ -140,6 +145,8 @@ int main(int argc, char* argv[])
 			{"romfsdir", 1, NULL, 17},
 			{"listromfs", 0, NULL, 18},
 			{"wavloops", 1, NULL, 19},
+			{"symbols", 1, NULL, 20},
+			{"linkedcro", 1, NULL, 21},
 			{NULL},
 		};
 
@@ -201,6 +208,8 @@ int main(int argc, char* argv[])
 					ctx.filetype = FILETYPE_CWAV;
 				else if (!strcmp(optarg, "romfs"))
 					ctx.filetype = FILETYPE_ROMFS;
+				else if (!strcmp(optarg, "cro"))
+					ctx.filetype = FILETYPE_CRO;
 			break;
 
 			case 0: settings_set_exefs_path(&ctx.usersettings, optarg); break;
@@ -223,7 +232,8 @@ int main(int argc, char* argv[])
 			case 17: settings_set_romfs_dir_path(&ctx.usersettings, optarg); break;
 			case 18: settings_set_list_romfs_files(&ctx.usersettings, 1); break;
 			case 19: settings_set_cwav_loopcount(&ctx.usersettings, strtoul(optarg, 0, 0)); break;
-
+			case 20: cro_set_symbolout(optarg); break;
+			case 21: cro_set_binout(optarg); break;
 
 			default:
 				usage(argv[0]);
@@ -433,6 +443,12 @@ int main(int argc, char* argv[])
 			romfs_set_usersettings(&romfsctx, &ctx.usersettings);
 			romfs_process(&romfsctx, ctx.actions);
 	
+			break;
+		}
+
+		case FILETYPE_CRO:
+		{
+			cro_process(ctx.infile, ctx.infilesize);
 			break;
 		}
 	}

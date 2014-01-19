@@ -26,7 +26,8 @@ typedef enum
 	FILETYPE_LZSS,
 	FILETYPE_FIRM,
 	FILETYPE_CWAV,
-	FILETYPE_ROMFS
+	FILETYPE_ROMFS,
+	FILETYPE_CRO
 } ctr_filetypes;
 
 typedef struct
