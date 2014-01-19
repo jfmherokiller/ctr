@@ -5,16 +5,14 @@
 
 #include "cro.h"
 
-static const char* cro_symbolout = NULL;
+static const char* cro_patchout = NULL;
 static const char* cro_binout = NULL;
 
-void cro_set_symbolout(const char* c)
-{
-    cro_symbolout = c;
+void cro_set_symbolout(const char* c) {
+    cro_patchout = c;
 }
 
-void cro_set_binout(const char* c)
-{
+void cro_set_binout(const char* c) {
     cro_binout = c;
 }
 
@@ -24,9 +22,9 @@ const char* cro_segment_from_id(uint32_t id) {
     else if(id == 1)
         return ".data";
     else if(id == 2) // which is data and bss?
-        return ".bss???";
+        return ".unk1";
     else if(id == 3)
-        return ".???";
+        return ".unk2";
     return ".unknown";
 }
 
@@ -41,8 +39,7 @@ uint32_t cro_decode_seg_offset(cro_segment* seg_tbl, uint32_t seg_tbl_num, uint3
     return seg_tbl[seg_idx].base + (off >> 4);
 }
 
-void cro_process(FILE* fd, size_t len)
-{
+void cro_process(FILE* fd, size_t len) {
     uint8_t* cro = malloc(len);
 
     if(cro == NULL) {
@@ -52,6 +49,7 @@ void cro_process(FILE* fd, size_t len)
 
     if(fread(cro, len, 1, fd) != 1) {
         perror("fread");
+        free(cro);
         return;
     }
 
@@ -60,10 +58,9 @@ void cro_process(FILE* fd, size_t len)
 
     if(h.magic != MAGIC_CRO0 && h.magic != MAGIC_FIXD) {
         fprintf(stderr, "Invalid magic\n");
+        free(cro);
         return;
     }
-
-    printf("Module name: %s\n", cro + h.name_off);
 
     // Dump header.
     printf("\nHeader:\n");
@@ -96,8 +93,8 @@ void cro_process(FILE* fd, size_t len)
     printf("Export Tree num:\t%"PRId32"\n", h.exp_tree_sz);
     printf("unk4 offset:\t\t0x%"PRIx32"\n", h.unk4_off);
     printf("unk4 num:\t\t%"PRId32"\n", h.unk4_num);
-    printf("unk5 offset:\t\t0x%"PRIx32"\n", h.unk5_off);
-    printf("unk5 num:\t\t%"PRId32"\n", h.unk5_num);
+    printf("Import Patches offset:\t0x%"PRIx32"\n", h.imp_patches_off);
+    printf("Import Patches num:\t%"PRId32"\n", h.imp_patches_num);
     printf("Import Table 1 offset:\t0x%"PRIx32"\n", h.imp1_tbl_off);
     printf("Import Table 1 num:\t%"PRId32"\n", h.imp1_tbl_num);
     printf("Import Table 2 offset:\t0x%"PRIx32"\n", h.imp2_tbl_off);
@@ -116,10 +113,10 @@ void cro_process(FILE* fd, size_t len)
     FILE* sym_fd = NULL;
 
     // Extract exported symbols.
-    if(cro_symbolout) {
-        printf("Writing symbols to %s..\n", cro_symbolout);
+    if(cro_patchout) {
+        printf("Writing symbols to %s..\n", cro_patchout);
 
-        sym_fd = fopen(cro_symbolout, "w");
+        sym_fd = fopen(cro_patchout, "w");
         if(sym_fd == NULL)
             perror("fopen");
         else {
@@ -132,6 +129,7 @@ void cro_process(FILE* fd, size_t len)
     // Dump Segment Table.
     if(!h.seg_tbl_num) {
         printf("ERROR: No segments..\n");
+        free(cro);
         return;
     }
 
@@ -187,7 +185,7 @@ void cro_process(FILE* fd, size_t len)
             printf("\tName offset: %s\n", cro + im[i].name_off);
             printf("\tSymbol offset: 0x%"PRIx32"\n", im[i].symbol_off);
 
-            cro_symbol* sy = (cro_symbol*) (cro + im[i].symbol_off);
+            cro_patch* sy = (cro_patch*) (cro + im[i].symbol_off);
             size_t n = 0;
             do {
                 uint32_t out_off = cro_decode_seg_offset(s, h.seg_tbl_num, sy->out_off);
@@ -201,7 +199,7 @@ void cro_process(FILE* fd, size_t len)
                     fprintf(sym_fd, "MakeComm(0x%"PRIx32", \"%s\");\n", out_off, cro + im[i].name_off);
                 }
 
-                printf("--> Write out=%"PRIx32" type=%x x=%"PRIx32"\n",
+                printf("\t\tWrite out=%"PRIx32" type=%x x=%"PRIx32"\n",
                        out_off, (unsigned int) sy->type, sy->x);
 
                 // XXX: keep IDA from XREF:ing all unlinked function pointers.
@@ -209,26 +207,23 @@ void cro_process(FILE* fd, size_t len)
                     sy->x = 0xBADC0DE;
 
                 switch(sy->type) {
-                case 0: // ignore
+                case 0:
                     break;
                 case 2: // u32 absolute
                     *out = sy->x;
                     break;
-                case 3: // u32 relative TODO
+                case 3:  // u32 relative TODO
                 case 10: // THUMB branch TODO
                 case 28: // ARM branch TODO
                 case 29: // ARM branch modify TODO
                 case 42: // u32 relative (weird) TODO
-                    exit(0);
+                    printf("ERROR: unhandled import type %x for %s\n",
+                           (unsigned int) sy->type, cro + im[i].name_off);
                     break;
 
                 default:
                     printf("ERROR: unknown import type %x for %s\n",
                            (unsigned int) sy->type, cro + im[i].name_off);
-                }
-
-                if(sy->x == 0) {
-                    *out = 0x0BADC0DE;
                 }
 
                 n++;

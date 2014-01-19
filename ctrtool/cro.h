@@ -26,7 +26,7 @@ typedef struct {
     uint8_t  unk0; // ??
     uint8_t  unk1; // ??
     uint32_t x;
-} cro_symbol;
+} cro_patch;
 
 typedef struct {
     uint8_t  hashtbl[0x80];
@@ -55,8 +55,8 @@ typedef struct {
     uint32_t exp_tree_sz;
     uint32_t unk4_off; // ??
     uint32_t unk4_num;
-    uint32_t unk5_off; // ??
-    uint32_t unk5_num;
+    uint32_t imp_patches_off; // ??
+    uint32_t imp_patches_num;
     uint32_t imp1_tbl_off;
     uint32_t imp1_tbl_num;
     uint32_t imp2_tbl_off;
