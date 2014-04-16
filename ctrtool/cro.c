@@ -39,9 +39,16 @@ uint32_t cro_decode_seg_offset(cro_segment* seg_tbl, uint32_t seg_tbl_num, uint3
     return seg_tbl[seg_idx].base + (off >> 4);
 }
 
-void cro_do_patch(cro_segment* seg_tbl, uint32_t seg_tbl_num, uint8_t* cro, cro_patch* patch) {
+void cro_do_patch(cro_segment* seg_tbl, uint32_t seg_tbl_num, uint8_t* cro, cro_patch* patch,
+    uint32_t len) {
+
     uint32_t out_off = cro_decode_seg_offset(seg_tbl, seg_tbl_num, patch->out_off);
     uint32_t* out = (uint32_t*) (cro + out_off);
+
+    if(out_off >= len) {
+        printf("ERROR: patch offset %x outside file\n", (unsigned int) out_off);
+        return;
+    }
 
     switch(patch->type) {
     case 0:
@@ -58,7 +65,7 @@ void cro_do_patch(cro_segment* seg_tbl, uint32_t seg_tbl_num, uint8_t* cro, cro_
         break;
 
     default:
-        printf("ERROR: unknown import type %x for %s\n", (unsigned int) patch->type);
+        printf("ERROR: unknown import type %x\n", (unsigned int) patch->type);
     }
 }
 
@@ -182,7 +189,7 @@ void cro_process(FILE* fd, size_t len) {
         cro_patch* p = (cro_patch*) (cro + h.patches_off);
 
         for(i=0; i<h.patches_num; i++) {
-            cro_do_patch(s, h.seg_tbl_num, cro, &p[i]);
+            cro_do_patch(s, h.seg_tbl_num, cro, &p[i], len);
         }
     }
 
@@ -239,7 +246,7 @@ void cro_process(FILE* fd, size_t len) {
                 if(sy->x == 0)
                     sy->x = 0xBADC0DE;
 
-                cro_do_patch(s, h.seg_tbl_num, cro, sy);
+                cro_do_patch(s, h.seg_tbl_num, cro, sy, len);
                 n++;
             } while(!(sy++)->is_last);
         }

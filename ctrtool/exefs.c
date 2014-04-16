@@ -200,6 +200,13 @@ void exefs_save(exefs_context* ctx, u32 index, u32 flags, exheader_context* exhe
 
         if(!strcmp(name, ".code")) {
             fprintf(stdout, "Splitting binary into sections..\n");
+
+            fout = freopen(outfname, "rb", fout);
+            if(fout == NULL) {
+                fprintf(stdout, "Error reopening outputted file\n");
+                goto clean;
+            }
+
             memcpy(outfname, dirpath->pathname, MAX_PATH);
             strcat(outfname, "/");
 
@@ -207,7 +214,6 @@ void exefs_save(exefs_context* ctx, u32 index, u32 flags, exheader_context* exhe
 		strcat(outfname, name+1);
             else
 		strcat(outfname, name);
-
 
             fseek(fout, 0, SEEK_SET);
 
@@ -236,7 +242,10 @@ void exefs_save(exefs_context* ctx, u32 index, u32 flags, exheader_context* exhe
 
 	    char textOutPath[MAX_PATH];
 	    snprintf(textOutPath, MAX_PATH, "%s_text_%08x.bin", outfname, text_addr);
-	    fread(maxBuffer, text_size, 1, fout);
+	    if(fread(maxBuffer, text_size, 1, fout) != 1) {
+		fprintf(stdout, "Error reading file\n");
+		goto clean;
+            }
 
 	    FILE* textOut = fopen(textOutPath, "wb");
 	    if(textOut == NULL) {
