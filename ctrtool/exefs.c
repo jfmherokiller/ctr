@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "types.h"
+#include "exheader.h"
 #include "exefs.h"
 #include "utils.h"
 #include "ncch.h"
@@ -74,14 +75,14 @@ void exefs_determine_key(exefs_context* ctx, u32 actions)
 	}
 }
 
-void exefs_save(exefs_context* ctx, u32 index, u32 flags)
+void exefs_save(exefs_context* ctx, u32 index, u32 flags, exheader_context* exheaderctx)
 {
 	exefs_sectionheader* section = (exefs_sectionheader*)(ctx->header.section + index);
 	char outfname[MAX_PATH];
 	char name[64];
 	u32 offset;
 	u32 size;
-	FILE* fout;
+	FILE* fout = NULL;
 	u32 compressedsize = 0;
 	u32 decompressedsize = 0;
 	u8* compressedbuffer = 0;
@@ -123,8 +124,6 @@ void exefs_save(exefs_context* ctx, u32 index, u32 flags)
 		goto clean;
 	}
 	
-	
-
 	fseek(ctx->file, ctx->offset + offset, SEEK_SET);
 	ctr_init_counter(&ctx->aes, ctx->key, ctx->counter);
 	ctr_add_counter(&ctx->aes, offset / 0x10);
@@ -166,7 +165,7 @@ void exefs_save(exefs_context* ctx, u32 index, u32 flags)
 		{
 			fprintf(stdout, "Error writing output file\n");
 			goto clean;
-		}		
+		}
 	}
 	else
 	{
@@ -199,9 +198,91 @@ void exefs_save(exefs_context* ctx, u32 index, u32 flags)
 		}
 	}
 
+        if(!strcmp(name, ".code")) {
+            fprintf(stdout, "Splitting binary into sections..\n");
+            memcpy(outfname, dirpath->pathname, MAX_PATH);
+            strcat(outfname, "/");
+
+            if (name[0] == '.')
+		strcat(outfname, name+1);
+            else
+		strcat(outfname, name);
+
+
+            fseek(fout, 0, SEEK_SET);
+
+            exheader_codesetinfo* codesetinfo = &exheaderctx->header.codesetinfo;
+            u32 text_addr = getle32(codesetinfo->text.address);
+            u32 text_size = getle32(codesetinfo->text.codesize);
+            u32 text_pagesize = getle32(codesetinfo->text.nummaxpages)*0x1000;
+            u32 ro_addr = getle32(codesetinfo->ro.address);
+            u32 ro_size = getle32(codesetinfo->ro.codesize);
+            u32 ro_pagesize = getle32(codesetinfo->ro.nummaxpages)*0x1000;
+            u32 data_addr = getle32(codesetinfo->data.address);
+            u32 data_size = getle32(codesetinfo->data.codesize);
+            u32 data_pagesize = getle32(codesetinfo->data.nummaxpages)*0x1000;
+
+            u32 max_size = text_size;
+            if(ro_size > max_size)
+                max_size = ro_size;
+            if(data_size > max_size)
+                max_size = data_size;
+
+	    u8* maxBuffer = malloc(max_size);
+	    if(maxBuffer == NULL) {
+		fprintf(stdout, "Error allocating memory\n");
+		goto clean;
+	    }
+
+	    char textOutPath[MAX_PATH];
+	    snprintf(textOutPath, MAX_PATH, "%s_text_%08x.bin", outfname, text_addr);
+	    fread(maxBuffer, text_size, 1, fout);
+
+	    FILE* textOut = fopen(textOutPath, "wb");
+	    if(textOut == NULL) {
+		fprintf(stdout, "Error opening output file\n");
+		goto clean;
+	    }
+
+	    fwrite(maxBuffer, text_size, 1, textOut);
+	    fclose(textOut);
+
+	    char roOutPath[MAX_PATH];
+            snprintf(roOutPath, MAX_PATH, "%s_ro_%08x.bin", outfname, ro_addr);
+            fread(maxBuffer, ro_size, 1, fout);
+
+            FILE* roOut = fopen(roOutPath, "wb");
+            if(roOut == NULL) {
+                fprintf(stdout, "Error opening output file\n");
+                goto clean;
+            }
+
+            fwrite(maxBuffer, ro_size, 1, roOut);
+            fclose(roOut);
+
+            char dataOutPath[MAX_PATH];
+            snprintf(dataOutPath, MAX_PATH, "%s_data_%08x.bin", outfname, data_addr);
+            fread(maxBuffer, data_size, 1, fout);
+
+            FILE* dataOut = fopen(dataOutPath, "wb");
+            if(dataOut == NULL) {
+                fprintf(stdout, "Error opening output file\n");
+                goto clean;
+            }
+
+            fwrite(maxBuffer, data_size, 1, dataOut);
+            fclose(dataOut);
+
+            free(maxBuffer);
+        }
+
 clean:
-	free(compressedbuffer);
-	free(decompressedbuffer);
+        if(fout != NULL)
+            fclose(fout);
+        if(compressedbuffer)
+            free(compressedbuffer);
+        if(decompressedbuffer)
+            free(decompressedbuffer);
 	return;
 }
 
@@ -221,7 +302,7 @@ void exefs_calculate_hash(exefs_context* ctx, u8 hash[32])
 	ctr_sha_256((const u8*)&ctx->header, sizeof(exefs_header), hash);
 }
 
-void exefs_process(exefs_context* ctx, u32 actions)
+void exefs_process(exefs_context* ctx, u32 actions, exheader_context* exheaderctx)
 {
 	u32 i;
 
@@ -248,7 +329,7 @@ void exefs_process(exefs_context* ctx, u32 actions)
 		{
 			makedir(dirpath->pathname);
 			for(i=0; i<8; i++)
-				exefs_save(ctx, i, actions);
+                            exefs_save(ctx, i, actions, exheaderctx);
 		}
 	}
 }

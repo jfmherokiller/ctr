@@ -6,8 +6,8 @@
 #include "keyset.h"
 #include "filepath.h"
 #include "ctr.h"
-#include "exefs.h"
 #include "exheader.h"
+#include "exefs.h"
 #include "settings.h"
 
 typedef enum
