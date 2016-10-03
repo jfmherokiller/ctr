@@ -21,7 +21,10 @@ enum flags
 	VerboseFlag = (1<<3),
 	VerifyFlag = (1<<4),
 	RawFlag = (1<<5),
-	ShowKeysFlag = (1<<6)
+	ShowKeysFlag = (1<<6),
+	ParseFlag = (1<<7),
+	CreateFlag = (1<<8),
+	CompressCodeFlag = (1<<9)
 };
 
 

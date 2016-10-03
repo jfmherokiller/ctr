@@ -6,6 +6,7 @@
 #include "exefs.h"
 #include "utils.h"
 #include "ncch.h"
+#include "blz.h"
 #include "lzss.h"
 
 void exefs_init(exefs_context* ctx)
@@ -129,7 +130,7 @@ void exefs_save(exefs_context* ctx, u32 index, u32 flags)
 	ctr_init_counter(&ctx->aes, ctx->key, ctx->counter);
 	ctr_add_counter(&ctx->aes, offset / 0x10);
 
-	if (index == 0 && ctx->compressedflag && ((flags & RawFlag) == 0))
+	if (index == 0 && (ctx->compressedflag || (flags & CompressCodeFlag)) && ((flags & RawFlag) == 0))
 	{
 		fprintf(stdout, "Decompressing section %s to %s...\n", name, outfname);
 
@@ -300,6 +301,92 @@ int exefs_verify(exefs_context* ctx, u32 index, u32 flags)
 		return 1;
 clean:
 	return 0;
+}
+
+int exefs_write_section(exefs_context* ctx, u32 index, u32 flags)
+{
+	exefs_sectionheader* section = (exefs_sectionheader*)(ctx->header.section + index);
+	filepath* sectionpath = settings_get_exefs_section_path(ctx->usersettings, index);
+	u8 buffer[16 * 1024];
+	u8 hash[0x20];
+	u32 size;
+	FILE* sectionfile;
+
+	if(sectionpath == 0 || !sectionpath->valid)
+		goto clean;
+
+	sectionfile=fopen(sectionpath->pathname,"rb");
+	if(sectionfile == 0)
+	{
+		fprintf(stdout, "Error reading input section file\n");
+		goto clean;
+	}
+
+	fseek(sectionfile, 0, SEEK_END);
+	size = ftell(sectionfile);
+	fseek(sectionfile, 0, SEEK_SET);
+
+	putle32(section->offset, ftell(ctx->file)-sizeof(exefs_header));
+
+	ctr_sha_256_init(&ctx->sha);
+	
+	if((flags & CompressCodeFlag) && !memcmp(settings_get_exefs_section_name(ctx->usersettings, index), ".code", 0x6))
+	{
+		unsigned char* pak_buffer = BLZ_Encode(sectionpath->pathname, &size, BLZ_NORMAL);
+		if (!pak_buffer)
+		{
+			fprintf(stdout, "Error reading input file\n");
+			goto clean;
+		}
+		fwrite(pak_buffer, 1, size, ctx->file);
+		ctr_sha_256_update(&ctx->sha, pak_buffer, size);
+		free(pak_buffer);
+	}else{
+		u32 k=size;
+		while(k)
+		{
+			u32 max = sizeof(buffer);
+			if (max > k)
+				max = k;
+
+			if (max != fread(buffer, 1, max, sectionfile))
+			{
+				fprintf(stdout, "Error reading input file\n");
+				goto clean;
+			}
+			fwrite(buffer, 1, max, ctx->file);
+
+			ctr_sha_256_update(&ctx->sha, buffer, max);
+
+			k -= max;
+		}		
+	}
+
+	ctr_sha_256_finish(&ctx->sha, hash);
+	
+	putle32(section->size, size);
+
+	memcpy(ctx->header.hashes[7-index], hash, 0x20);
+
+	fclose(sectionfile);
+clean:
+	return 0;
+}
+
+void exefs_create(exefs_context* ctx, u32 actions)
+{
+	int i;
+	fseek(ctx->file, sizeof(exefs_header), SEEK_SET);
+
+	for(i=0;i<8;i++)
+	{
+		exefs_write_section(ctx, i, actions);
+		memcpy(ctx->header.section[i].name, settings_get_exefs_section_name(ctx->usersettings, i), 0x8);
+		fseek(ctx->file, 0x100-(ftell(ctx->file)&0xFF), SEEK_CUR);
+	}
+
+	fseek(ctx->file, 0, SEEK_SET);
+	fwrite(&ctx->header, 1, sizeof(exefs_header), ctx->file);
 }
 
 void exefs_print(exefs_context* ctx)
