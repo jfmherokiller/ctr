@@ -26,8 +26,13 @@ typedef enum
 	FILETYPE_LZSS,
 	FILETYPE_FIRM,
 	FILETYPE_CWAV,
+<<<<<<< HEAD
 	FILETYPE_EXEFS,
 	FILETYPE_ROMFS
+=======
+	FILETYPE_ROMFS,
+	FILETYPE_CRO
+>>>>>>> plutooo/master
 } ctr_filetypes;
 
 typedef struct

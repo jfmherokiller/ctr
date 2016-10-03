@@ -17,6 +17,7 @@
 #include "firm.h"
 #include "cwav.h"
 #include "romfs.h"
+#include "cro.h"
 
 enum cryptotype
 {
@@ -42,6 +43,7 @@ static void usage(const char *argv0)
 		   "Usage: %s [options...] <file>\n"
 		   "CTRTOOL (c) neimod.\n"
 		   "(smea fork, BLZ code by CUE)\n"
+		   "(c) plutooo.\n"
            "\n"
            "Options:\n"
            "  -i, --info           Show file info.\n"
@@ -60,7 +62,7 @@ static void usage(const char *argv0)
 		   "  --ncchsyskey=key     Set ncch fixed system key.\n"
 		   "  --showkeys           Show the keys being used.\n"
 		   "  -t, --intype=type	   Specify input file type [ncsd, ncch, exheader, cia, tmd,\n"
-		   "                                                lzss, firm, cwav, romfs]\n"
+		   "                                                lzss, firm, cwav, romfs, cro]\n"
 		   "LZSS options:\n"  
 		   "  --lzssout=file	   Specify lzss output file\n"
 		   "CXI/CCI options:\n"  
@@ -84,9 +86,12 @@ static void usage(const char *argv0)
 		   "  --compresscode       Compress .code section\n"
 		   "  --sectionNfile=file  Specify input file for section N (0 <= N < 8)\n"
 		   "  --sectionNname=file  Specify input file for section N (0 <= N < 8)\n"
-		   "ROMFS options:\n"  
+		   "ROMFS options:\n"
 		   "  --romfsdir=dir       Specify RomFS directory path.\n"
 		   "  --listromfs          List files in RomFS.\n"
+		   "CRO options:\n"
+		   "  --symbols=file     Output IDA Pro script with symbols/segments.\n"
+		   "  --linkedcro=file   Output patched CRO file according to import-table.\n"
            "\n",
 		   argv0);
    exit(1);
@@ -98,7 +103,7 @@ int action_parse(toolcontext* ctx, char* fname)
 
 	ctx->infile = fopen(fname, "rb");
 
-	if (ctx->infile == 0) 
+	if (ctx->infile == 0)
 	{
 		fprintf(stderr, "error: could not open input file!\n");
 		return -1;
@@ -133,7 +138,7 @@ int action_parse(toolcontext* ctx, char* fname)
 	{
 		fseek(ctx->infile, 0, SEEK_SET);
 		fread(magic, 1, 4, ctx->infile);
-		
+
 		switch(getle32(magic))
 		{
 			case 0x2020:
@@ -172,8 +177,8 @@ int action_parse(toolcontext* ctx, char* fname)
 			ncsd_set_size(&ncsdctx, ctx->infilesize);
 			ncsd_set_usersettings(&ncsdctx, &ctx->usersettings);
 			ncsd_process(&ncsdctx, ctx->actions);
-			
-			break;			
+
+			break;
 		}
 
 		case FILETYPE_FIRM:
@@ -185,10 +190,10 @@ int action_parse(toolcontext* ctx, char* fname)
 			firm_set_size(&firmctx, ctx->infilesize);
 			firm_set_usersettings(&firmctx, &ctx->usersettings);
 			firm_process(&firmctx, ctx->actions);
-			
-			break;			
+
+			break;
 		}
-		
+
 		case FILETYPE_CXI:
 		{
 			ncch_context ncchctx;
@@ -201,7 +206,7 @@ int action_parse(toolcontext* ctx, char* fname)
 
 			break;
 		}
-		
+
 
 		case FILETYPE_CIA:
 		{
@@ -227,7 +232,7 @@ int action_parse(toolcontext* ctx, char* fname)
 
 			exheader_set_usersettings(&exheaderctx, &ctx->usersettings);
 			exheader_process(&exheaderctx, ctx->actions);
-	
+
 			break;
 		}
 
@@ -240,7 +245,7 @@ int action_parse(toolcontext* ctx, char* fname)
 			tmd_set_size(&tmdctx, ctx->infilesize);
 			tmd_set_usersettings(&tmdctx, &ctx->usersettings);
 			tmd_process(&tmdctx, ctx->actions);
-	
+
 			break;
 		}
 
@@ -253,7 +258,7 @@ int action_parse(toolcontext* ctx, char* fname)
 			lzss_set_size(&lzssctx, ctx->infilesize);
 			lzss_set_usersettings(&lzssctx, &ctx->usersettings);
 			lzss_process(&lzssctx, ctx->actions);
-	
+
 			break;
 		}
 
@@ -267,7 +272,7 @@ int action_parse(toolcontext* ctx, char* fname)
 			cwav_set_size(&cwavctx, ctx->infilesize);
 			cwav_set_usersettings(&cwavctx, &ctx->usersettings);
 			cwav_process(&cwavctx, ctx->actions);
-	
+
 			break;
 		}
 
@@ -280,7 +285,7 @@ int action_parse(toolcontext* ctx, char* fname)
 			exefs_set_size(&exefsctx, ctx->infilesize);
 			exefs_set_usersettings(&exefsctx, &ctx->usersettings);
 			exefs_process(&exefsctx, ctx->actions);
-	
+
 			break;
 		}
 
@@ -293,11 +298,17 @@ int action_parse(toolcontext* ctx, char* fname)
 			romfs_set_size(&romfsctx, ctx->infilesize);
 			romfs_set_usersettings(&romfsctx, &ctx->usersettings);
 			romfs_process(&romfsctx, ctx->actions);
-	
+
+			break;
+		}
+
+		case FILETYPE_CRO:
+		{
+			cro_process(ctx.infile, ctx->infilesize);
 			break;
 		}
 	}
-	
+
 	if (ctx->infile)
 		fclose(ctx->infile);
 
@@ -350,7 +361,7 @@ int main(int argc, char* argv[])
 	char keysetfname[512] = "keys.xml";
 	keyset tmpkeys;
 	unsigned int checkkeysetfile = 0;
-	
+
 	memset(&ctx, 0, sizeof(toolcontext));
 	ctx.actions = InfoFlag | ExtractFlag | ParseFlag;
 	ctx.filetype = FILETYPE_UNKNOWN;
@@ -360,10 +371,10 @@ int main(int argc, char* argv[])
 	keyset_init(&tmpkeys);
 
 
-	while (1) 
+	while (1)
 	{
 		int option_index;
-		static struct option long_options[] = 
+		static struct option long_options[] =
 		{
 			{"create", 0, NULL, 'c'},
 			{"extract", 0, NULL, 'x'},
@@ -395,6 +406,8 @@ int main(int argc, char* argv[])
 			{"romfsdir", 1, NULL, 17},
 			{"listromfs", 0, NULL, 18},
 			{"wavloops", 1, NULL, 19},
+			{"symbols", 1, NULL, 20},
+			{"linkedcro", 1, NULL, 21},
 
 			{"section0file", 1, NULL, SECTION_FILE_ARG_BASE+0},
 			{"section1file", 1, NULL, SECTION_FILE_ARG_BASE+1},
@@ -422,7 +435,7 @@ int main(int argc, char* argv[])
 		if (c == -1)
 			break;
 
-		switch (c) 
+		switch (c)
 		{
 			case 'c':
 				ctx.actions |= CreateFlag;
@@ -505,6 +518,8 @@ int main(int argc, char* argv[])
 			case 17: settings_set_romfs_dir_path(&ctx.usersettings, optarg); break;
 			case 18: settings_set_list_romfs_files(&ctx.usersettings, 1); break;
 			case 19: settings_set_cwav_loopcount(&ctx.usersettings, strtoul(optarg, 0, 0)); break;
+			case 20: cro_set_symbolout(optarg); break;
+			case 21: cro_set_binout(optarg); break;
 			case 40: ctx.actions |= CompressCodeFlag; break;
 
 			case SECTION_FILE_ARG_BASE+0:
@@ -535,11 +550,11 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (optind == argc - 1) 
+	if (optind == argc - 1)
 	{
 		// Exactly one extra argument - an input file
 		strncpy(fname, argv[optind], sizeof(fname));
-	} 
+	}
 	else if ( (optind < argc) || (argc == 1) )
 	{
 		// Too many extra args

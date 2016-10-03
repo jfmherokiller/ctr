@@ -38,6 +38,7 @@ typedef struct
 	int hashcheck[8];
 	int compressedflag;
 	int encrypted;
+
 } exefs_context;
 
 void exefs_init(exefs_context* ctx);
@@ -53,9 +54,10 @@ void exefs_set_encrypted(exefs_context* ctx, u32 encrypted);
 void exefs_read_header(exefs_context* ctx, u32 flags);
 void exefs_calculate_hash(exefs_context* ctx, u8 hash[32]);
 void exefs_process(exefs_context* ctx, u32 actions);
+void exefs_process(exefs_context* ctx, u32 actions, exheader_context* exheaderctx);
 void exefs_create(exefs_context* ctx, u32 actions);
 void exefs_print(exefs_context* ctx);
-void exefs_save(exefs_context* ctx, u32 index, u32 flags);
+void exefs_save(exefs_context* ctx, u32 index, u32 flags, exheader_context* exheaderctx);
 int exefs_verify(exefs_context* ctx, u32 index, u32 flags);
 void exefs_determine_key(exefs_context* ctx, u32 actions);
 #endif // _EXEFS_H_
