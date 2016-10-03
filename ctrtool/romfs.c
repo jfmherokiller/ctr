@@ -7,6 +7,15 @@
 #include "romfs.h"
 #include "utils.h"
 
+#ifdef _WIN32
+#define fseek _fseeki64
+#endif
+
+#ifdef linux
+#define _FILE_OFFSET_BITS 64
+#define fseek fseeko
+#endif
+
 void romfs_init(romfs_context* ctx)
 {
 	memset(ctx, 0, sizeof(romfs_context));
@@ -236,6 +245,7 @@ void romfs_visit_dir(romfs_context* ctx, u32 diroffset, u32 depth, u32 actions, 
 
 void romfs_visit_file(romfs_context* ctx, u32 fileoffset, u32 depth, u32 actions, filepath* rootpath)
 {
+    do {
 	u32 siblingoffset = 0;
 	filepath currentpath;
 	romfs_fileentry* entry = &ctx->fileentry;
@@ -279,9 +289,8 @@ void romfs_visit_file(romfs_context* ctx, u32 fileoffset, u32 depth, u32 actions
 	}
 
 	siblingoffset = getle32(entry->siblingoffset);
-
-	if (siblingoffset != (~0))
-		romfs_visit_file(ctx, siblingoffset, depth, actions, rootpath);
+    fileoffset = siblingoffset;
+    } while (fileoffset != (~0));
 }
 
 void romfs_extract_datafile(romfs_context* ctx, u64 offset, u64 size, filepath* path)
