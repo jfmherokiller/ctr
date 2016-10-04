@@ -61,10 +61,10 @@ static void usage(const char *argv0)
 		   "  --ncchkey=key        Set ncch key.\n"
 		   "  --ncchsyskey=key     Set ncch fixed system key.\n"
 		   "  --showkeys           Show the keys being used.\n"
-		   "  -t, --intype=type	   Specify input file type [ncsd, ncch, exheader, cia, tmd,\n"
-		   "                                                lzss, firm, cwav, romfs, cro]\n"
+		   "  -t, --intype=type    Specify input file type.\n"
+		   "                            [ncsd, ncch, exheader, cia, tmd, lzss, firm, cwav, romfs, cro]\n"
 		   "LZSS options:\n"  
-		   "  --lzssout=file	   Specify lzss output file\n"
+		   "  --lzssout=file       Specify lzss output file\n"
 		   "CXI/CCI options:\n"  
 		   "  -n, --ncch=offs      Specify offset for NCCH header.\n"
 		   "  --exefs=file         Specify ExeFS file path.\n"
@@ -90,8 +90,8 @@ static void usage(const char *argv0)
 		   "  --romfsdir=dir       Specify RomFS directory path.\n"
 		   "  --listromfs          List files in RomFS.\n"
 		   "CRO options:\n"
-		   "  --symbols=file     Output IDA Pro script with symbols/segments.\n"
-		   "  --linkedcro=file   Output patched CRO file according to import-table.\n"
+		   "  --symbols=file       Output IDA Pro script with symbols/segments.\n"
+		   "  --linkedcro=file     Output patched CRO file according to import-table.\n"
            "\n",
 		   argv0);
    exit(1);
@@ -278,13 +278,23 @@ int action_parse(toolcontext* ctx, char* fname)
 
 		case FILETYPE_EXEFS:
 		{
+            exheader_context exheaderctx;
+
+            exheader_init(&exheaderctx);
+            exheader_set_file(&exheaderctx, ctx->infile);
+            exheader_set_size(&exheaderctx, ctx->infilesize);
+            settings_set_ignore_programid(&ctx->usersettings, 1);
+
+            exheader_set_usersettings(&exheaderctx, &ctx->usersettings);
+            exheader_process(&exheaderctx, ctx->actions);
+
 			exefs_context exefsctx;
 
 			exefs_init(&exefsctx);
 			exefs_set_file(&exefsctx, ctx->infile);
 			exefs_set_size(&exefsctx, ctx->infilesize);
 			exefs_set_usersettings(&exefsctx, &ctx->usersettings);
-			exefs_process(&exefsctx, ctx->actions);
+			exefs_process(&exefsctx, ctx->actions, &exheaderctx);
 
 			break;
 		}
@@ -304,7 +314,7 @@ int action_parse(toolcontext* ctx, char* fname)
 
 		case FILETYPE_CRO:
 		{
-			cro_process(ctx.infile, ctx->infilesize);
+			cro_process(ctx->infile, ctx->infilesize);
 			break;
 		}
 	}

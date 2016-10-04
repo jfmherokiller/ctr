@@ -53,7 +53,6 @@ void exefs_set_key(exefs_context* ctx, u8 key[16]);
 void exefs_set_encrypted(exefs_context* ctx, u32 encrypted);
 void exefs_read_header(exefs_context* ctx, u32 flags);
 void exefs_calculate_hash(exefs_context* ctx, u8 hash[32]);
-void exefs_process(exefs_context* ctx, u32 actions);
 void exefs_process(exefs_context* ctx, u32 actions, exheader_context* exheaderctx);
 void exefs_create(exefs_context* ctx, u32 actions);
 void exefs_print(exefs_context* ctx);
