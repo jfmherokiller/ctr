@@ -5,7 +5,7 @@
 #include "keyset.h"
 #include "filepath.h"
 
-#define SECTION_FILE_ARG_BASE (20)
+#define SECTION_FILE_ARG_BASE (1000)
 #define SECTION_NAME_ARG_BASE (28)
 
 typedef struct
