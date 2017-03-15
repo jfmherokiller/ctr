@@ -6,7 +6,7 @@
 
 import sys
 import struct
-from idaapi import Choose
+from idaapi import Choose,add_segm,mem2base,add_entry
 import construct
 from construct import *
 
