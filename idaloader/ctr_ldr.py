@@ -2,13 +2,14 @@
 #
 # CTR FIRM/NCCH IDA Loader by blasty
 # ==================================
-# requires construct and idapython.
+# requires construct2.5 and idapython.
 
 import sys
 import struct
-from idaapi import Choose
+from idaapi import Choose,add_segm,mem2base
 import construct
 from construct import *
+
 
 def u8(name, len = 1):
 	if len == 1:
@@ -65,7 +66,7 @@ def ncch_hdr(name):
 		u32("reserved"),
 		u64("program_id"),
 		u8("tmp_flag"),
-		u8("reserved_", 0x2f),
+		u8("reserved", 0x2f),
 		u8("product_code", 0x10),
 		u8("exhdr_hash", 0x20),
 		u32("exhdr_size"),
@@ -223,9 +224,6 @@ def load_firm_file(f, offs):
 		add_segm(0, section.loadadr, section.loadadr + section.size, ".section0"+str(section.core), "CODE")
 		mem2base(b[section.offset:], section.loadadr, section.loadadr + section.size)
 
-	add_entry(hdr.arm11_entry, hdr.arm11_entry, "arm11_start", True)
-	add_entry(hdr.arm9_entry, hdr.arm9_entry, "arm9_start", True)
-		
 	return 1
 
 def load_ncch_file(f, offset):
